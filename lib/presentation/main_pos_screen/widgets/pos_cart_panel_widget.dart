@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../theme/app_theme.dart';
 import '../../../widgets/empty_state_widget.dart';
 import '../main_pos_screen.dart';
@@ -9,8 +10,11 @@ class PosCartPanelWidget extends StatelessWidget {
   final int plasticBagCount;
   final double plasticBagPrice;
   final double subtotal;
+  final double discountAmount;
+  final double totalAmount;
   final int totalItemCount;
   final String transactionId;
+  final String? couponCode;
   final String Function(double) formatCurrency;
   final void Function(String productId) onRemove;
   final void Function(String productId) onAdd;
@@ -21,8 +25,11 @@ class PosCartPanelWidget extends StatelessWidget {
     required this.plasticBagCount,
     required this.plasticBagPrice,
     required this.subtotal,
+    required this.discountAmount,
+    required this.totalAmount,
     required this.totalItemCount,
     required this.transactionId,
+    required this.couponCode,
     required this.formatCurrency,
     required this.onRemove,
     required this.onAdd,
@@ -37,9 +44,7 @@ class PosCartPanelWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Cart header
-          _buildCartHeader(context),
-          // Cart items list
+          _buildCartHeader(),
           Expanded(
             child: cartItems.isEmpty && plasticBagCount == 0
                 ? EmptyStateWidget(
@@ -51,21 +56,18 @@ class PosCartPanelWidget extends StatelessWidget {
                 : ListView(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     children: [
-                      ...cartItems.map(
-                        (item) => _buildCartItemRow(context, item),
-                      ),
-                      if (plasticBagCount > 0) _buildPlasticBagRow(context),
+                      ...cartItems.map(_buildCartItemRow),
+                      if (plasticBagCount > 0) _buildPlasticBagRow(),
                     ],
                   ),
           ),
-          // Cart total footer
-          _buildCartFooter(context),
+          _buildCartFooter(),
         ],
       ),
     );
   }
 
-  Widget _buildCartHeader(BuildContext context) {
+  Widget _buildCartHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -122,7 +124,7 @@ class PosCartPanelWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCartItemRow(BuildContext context, CartItem item) {
+  Widget _buildCartItemRow(CartItem item) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -133,7 +135,6 @@ class PosCartPanelWidget extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Product name + category
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,18 +163,15 @@ class PosCartPanelWidget extends StatelessWidget {
                   style: GoogleFonts.ibmPlexSans(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          // Quantity controls + line total
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Qty controls
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -191,7 +189,6 @@ class PosCartPanelWidget extends StatelessWidget {
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.textPrimary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -203,14 +200,12 @@ class PosCartPanelWidget extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              // Line total
               Text(
                 formatCurrency(item.lineTotal),
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -220,7 +215,7 @@ class PosCartPanelWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildPlasticBagRow(BuildContext context) {
+  Widget _buildPlasticBagRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -260,7 +255,7 @@ class PosCartPanelWidget extends StatelessWidget {
             ),
           ),
           Text(
-            '×$plasticBagCount',
+            'x$plasticBagCount',
             style: GoogleFonts.ibmPlexSans(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -274,7 +269,6 @@ class PosCartPanelWidget extends StatelessWidget {
               fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppTheme.bagBtn,
-              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -302,7 +296,7 @@ class PosCartPanelWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCartFooter(BuildContext context) {
+  Widget _buildCartFooter() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -333,12 +327,35 @@ class PosCartPanelWidget extends StatelessWidget {
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 13,
                   color: AppTheme.textSecondary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
+          if (discountAmount > 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Coupon ${couponCode ?? ''}',
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 13,
+                    color: AppTheme.success,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '-${formatCurrency(discountAmount)}',
+                  style: GoogleFonts.ibmPlexSans(
+                    fontSize: 13,
+                    color: AppTheme.success,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -351,12 +368,11 @@ class PosCartPanelWidget extends StatelessWidget {
                 ),
               ),
               Text(
-                formatCurrency(subtotal),
+                formatCurrency(totalAmount),
                 style: GoogleFonts.ibmPlexSans(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                   color: AppTheme.primary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],

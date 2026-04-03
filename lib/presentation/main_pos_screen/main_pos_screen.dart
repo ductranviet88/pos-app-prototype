@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/models/receipt_models.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 import './widgets/pos_action_bar_widget.dart';
@@ -8,7 +11,6 @@ import './widgets/pos_cart_panel_widget.dart';
 import './widgets/pos_product_grid_widget.dart';
 import './widgets/pos_top_bar_widget.dart';
 
-// Mock data models
 class ProductItem {
   final String id;
   final String name;
@@ -64,8 +66,6 @@ class MainPosScreen extends StatefulWidget {
 }
 
 class _MainPosScreenState extends State<MainPosScreen> {
-  // TODO: Replace with Riverpod/Bloc for production state management
-
   static final List<Map<String, dynamic>> _productMaps = [
     {
       'id': 'P001',
@@ -193,6 +193,8 @@ class _MainPosScreenState extends State<MainPosScreen> {
   final List<CartItem> _cartItems = [];
   String _selectedCategory = 'All';
   String _currentTransactionId = '';
+  String? _couponCode;
+  double _couponRate = 0;
   bool _isSubmitting = false;
 
   static const double _plasticBagPrice = 500.0;
@@ -218,7 +220,9 @@ class _MainPosScreenState extends State<MainPosScreen> {
 
   String _generateTransactionId() {
     final now = DateTime.now();
-    return 'TXN${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.millisecondsSinceEpoch % 100000}';
+    return 'TXN${now.year}${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}'
+        '${now.millisecondsSinceEpoch % 100000}';
   }
 
   List<ProductItem> get _filteredProducts {
@@ -231,6 +235,10 @@ class _MainPosScreenState extends State<MainPosScreen> {
     total += _plasticBagCount * _plasticBagPrice;
     return total;
   }
+
+  double get _discountAmount => _cartSubtotal * _couponRate;
+
+  double get _payableTotal => _cartSubtotal - _discountAmount;
 
   int get _totalItemCount {
     int count = _cartItems.fold(0, (sum, item) => sum + item.quantity);
@@ -273,7 +281,8 @@ class _MainPosScreenState extends State<MainPosScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Plastic bag added (×$_plasticBagCount) — ${_formatCurrency(_plasticBagPrice)} each',
+          'Plastic bag added (x$_plasticBagCount) '
+          '- ${_formatCurrency(_plasticBagPrice)} each',
           style: GoogleFonts.ibmPlexSans(),
         ),
         backgroundColor: AppTheme.bagBtn,
@@ -282,6 +291,142 @@ class _MainPosScreenState extends State<MainPosScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
+  }
+
+  void _showCouponDialog() {
+    if (_cartItems.isEmpty && _plasticBagCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Add items before applying a coupon.',
+            style: GoogleFonts.ibmPlexSans(),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+      return;
+    }
+
+    final controller = TextEditingController(text: _couponCode ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Apply Coupon',
+          style: GoogleFonts.ibmPlexSans(fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 4,
+              decoration: const InputDecoration(
+                labelText: 'Coupon code',
+                hintText: '1010 or 2020',
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '1010 = 10% off, 2020 = 20% off',
+              style: GoogleFonts.ibmPlexSans(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (_couponCode != null)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _clearCoupon(showMessage: true);
+              },
+              child: const Text('Remove Coupon'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _applyCoupon(controller.text.trim());
+            },
+            child: const Text(
+              'Apply',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyCoupon(String code) {
+    final normalizedCode = code.trim();
+    final rate = switch (normalizedCode) {
+      '1010' => 0.10,
+      '2020' => 0.20,
+      _ => -1.0,
+    };
+
+    if (rate < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Invalid coupon. Use 1010 or 2020.',
+            style: GoogleFonts.ibmPlexSans(),
+          ),
+          backgroundColor: AppTheme.cancelBtn,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _couponCode = normalizedCode;
+      _couponRate = rate;
+    });
+
+    final discountPercent = (rate * 100).round();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Coupon $normalizedCode applied: $discountPercent% off.',
+          style: GoogleFonts.ibmPlexSans(),
+        ),
+        backgroundColor: AppTheme.checkBtn,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _clearCoupon({bool showMessage = false}) {
+    setState(() {
+      _couponCode = null;
+      _couponRate = 0;
+    });
+
+    if (showMessage) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Coupon removed.',
+            style: GoogleFonts.ibmPlexSans(),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _cancelOrder() {
@@ -310,7 +455,8 @@ class _MainPosScreenState extends State<MainPosScreen> {
           ),
         ),
         content: Text(
-          'Are you sure you want to cancel the current order?\nAll $_totalItemCount item(s) will be removed.',
+          'Are you sure you want to cancel the current order?\n'
+          'All $_totalItemCount item(s) will be removed.',
           style: GoogleFonts.ibmPlexSans(fontSize: 14),
         ),
         actions: [
@@ -324,6 +470,8 @@ class _MainPosScreenState extends State<MainPosScreen> {
               setState(() {
                 _cartItems.clear();
                 _plasticBagCount = 0;
+                _couponCode = null;
+                _couponRate = 0;
                 _currentTransactionId = _generateTransactionId();
               });
               ScaffoldMessenger.of(context).showSnackBar(
@@ -422,19 +570,24 @@ class _MainPosScreenState extends State<MainPosScreen> {
                   children: [
                     ..._cartItems.map(
                       (item) => _buildSummaryRow(
-                        '${item.product.name} ×${item.quantity}',
+                        '${item.product.name} x${item.quantity}',
                         _formatCurrency(item.lineTotal),
                       ),
                     ),
                     if (_plasticBagCount > 0)
                       _buildSummaryRow(
-                        'Plastic Bag ×$_plasticBagCount',
+                        'Plastic Bag x$_plasticBagCount',
                         _formatCurrency(_plasticBagCount * _plasticBagPrice),
+                      ),
+                    if (_discountAmount > 0)
+                      _buildSummaryRow(
+                        'Coupon ${_couponCode ?? ''}',
+                        '-${_formatCurrency(_discountAmount)}',
                       ),
                     const Divider(height: 24),
                     _buildSummaryRow(
                       'Total ($_totalItemCount items)',
-                      _formatCurrency(_cartSubtotal),
+                      _formatCurrency(_payableTotal),
                       isTotal: true,
                     ),
                   ],
@@ -527,16 +680,46 @@ class _MainPosScreenState extends State<MainPosScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // TODO: Replace with real order submission API for production
     await Future.delayed(const Duration(milliseconds: 800));
 
     if (mounted) {
       final submittedId = _currentTransactionId;
-      final submittedTotal = _cartSubtotal;
+      final submittedSubtotal = _cartSubtotal;
+      final submittedDiscount = _discountAmount;
+      final submittedTotal = _payableTotal;
+      final submittedItemCount = _totalItemCount;
+      final submittedAt = DateTime.now();
+      final receiptItems = [
+        ..._cartItems.map(
+          (item) => ReceiptLineItem(
+            name: item.product.name,
+            quantity: item.quantity,
+            unitPrice: item.product.price,
+          ),
+        ),
+        if (_plasticBagCount > 0)
+          ReceiptLineItem(
+            name: 'Plastic Bag',
+            quantity: _plasticBagCount,
+            unitPrice: _plasticBagPrice,
+          ),
+      ];
+      final receiptData = ReceiptData(
+        transactionId: submittedId,
+        subtotalAmount: submittedSubtotal,
+        discountAmount: submittedDiscount,
+        totalAmount: submittedTotal,
+        totalItemCount: submittedItemCount,
+        submittedAt: submittedAt,
+        items: receiptItems,
+        couponCode: _couponCode,
+      );
       setState(() {
         _isSubmitting = false;
         _cartItems.clear();
         _plasticBagCount = 0;
+        _couponCode = null;
+        _couponRate = 0;
         _currentTransactionId = _generateTransactionId();
       });
       Navigator.pushNamed(
@@ -545,6 +728,7 @@ class _MainPosScreenState extends State<MainPosScreen> {
         arguments: {
           'paymentAmount': submittedTotal,
           'transactionId': submittedId,
+          'receiptData': receiptData,
         },
       );
     }
@@ -561,7 +745,6 @@ class _MainPosScreenState extends State<MainPosScreen> {
       backgroundColor: const Color(0xFFF0F4FF),
       body: Column(
         children: [
-          // Top status bar
           PosTopBarWidget(
             transactionId: _currentTransactionId,
             onLogout: () {
@@ -627,13 +810,10 @@ class _MainPosScreenState extends State<MainPosScreen> {
               );
             },
           ),
-
-          // Main body
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Left: Cart panel (40%)
                 SizedBox(
                   width: MediaQuery.of(context).size.width * 0.38,
                   child: PosCartPanelWidget(
@@ -641,8 +821,11 @@ class _MainPosScreenState extends State<MainPosScreen> {
                     plasticBagCount: _plasticBagCount,
                     plasticBagPrice: _plasticBagPrice,
                     subtotal: _cartSubtotal,
+                    discountAmount: _discountAmount,
+                    totalAmount: _payableTotal,
                     totalItemCount: _totalItemCount,
                     transactionId: _currentTransactionId,
+                    couponCode: _couponCode,
                     formatCurrency: _formatCurrency,
                     onRemove: _removeFromCart,
                     onAdd: (id) {
@@ -651,15 +834,10 @@ class _MainPosScreenState extends State<MainPosScreen> {
                     },
                   ),
                 ),
-
-                // Right: Product grid + actions (60%)
                 Expanded(
                   child: Column(
                     children: [
-                      // Category filter
                       _buildCategoryFilter(),
-
-                      // Product grid
                       Expanded(
                         child: PosProductGridWidget(
                           products: _filteredProducts,
@@ -667,14 +845,13 @@ class _MainPosScreenState extends State<MainPosScreen> {
                           formatCurrency: _formatCurrency,
                         ),
                       ),
-
-                      // Action bar
                       PosActionBarWidget(
                         isSubmitting: _isSubmitting,
                         hasItems: _cartItems.isNotEmpty || _plasticBagCount > 0,
                         onCheckOrder: _checkOrder,
                         onAddPlasticBag: _addPlasticBag,
                         onCancelOrder: _cancelOrder,
+                        onCoupon: _showCouponDialog,
                         onSubmitOrder: _submitOrder,
                       ),
                     ],

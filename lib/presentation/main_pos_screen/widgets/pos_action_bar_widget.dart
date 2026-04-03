@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../theme/app_theme.dart';
 
 class PosActionBarWidget extends StatelessWidget {
@@ -8,6 +9,7 @@ class PosActionBarWidget extends StatelessWidget {
   final VoidCallback onCheckOrder;
   final VoidCallback onAddPlasticBag;
   final VoidCallback onCancelOrder;
+  final VoidCallback onCoupon;
   final VoidCallback onSubmitOrder;
 
   const PosActionBarWidget({
@@ -17,6 +19,7 @@ class PosActionBarWidget extends StatelessWidget {
     required this.onCheckOrder,
     required this.onAddPlasticBag,
     required this.onCancelOrder,
+    required this.onCoupon,
     required this.onSubmitOrder,
   });
 
@@ -37,7 +40,6 @@ class PosActionBarWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Check Order
           Expanded(
             child: _ActionButton(
               label: 'Check Order',
@@ -48,7 +50,6 @@ class PosActionBarWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Add Plastic Bag
           Expanded(
             child: _ActionButton(
               label: 'Plastic Bag',
@@ -59,7 +60,6 @@ class PosActionBarWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Cancel Order
           Expanded(
             child: _ActionButton(
               label: 'Cancel Order',
@@ -70,7 +70,17 @@ class PosActionBarWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // Submit Order — wider
+          SizedBox(
+            width: 132,
+            child: _ActionButton(
+              label: 'Coupon',
+              icon: Icons.local_offer_outlined,
+              color: const Color(0xFF7C3AED),
+              onTap: onCoupon,
+              isEnabled: hasItems && !isSubmitting,
+            ),
+          ),
+          const SizedBox(width: 8),
           SizedBox(
             width: 160,
             child: _ActionButton(

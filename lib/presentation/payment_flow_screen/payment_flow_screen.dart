@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/models/receipt_models.dart';
+import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 
 class PaymentFlowScreen extends StatefulWidget {
   final double paymentAmount;
   final String transactionId;
+  final ReceiptData? receiptData;
 
   const PaymentFlowScreen({
     super.key,
     required this.paymentAmount,
     required this.transactionId,
+    this.receiptData,
   });
 
   @override
@@ -158,13 +162,22 @@ class _PaymentFlowScreenState extends State<PaymentFlowScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(
+                      context,
+                      AppRoutes.receiptScreen,
+                      arguments: widget.receiptData?.copyWith(
+                        cardType: _cardType,
+                        cardBrand: _cardBrand,
+                        lastFourDigits: _lastFour,
+                        approvedCode: _approvedCode,
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1565C0),
                   ),
                   child: const Text(
-                    'Print Receipt',
+                    'View Receipt',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
